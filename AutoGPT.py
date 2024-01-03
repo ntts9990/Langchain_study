@@ -7,7 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+os.environ["SERPAPI_API_KEY"] = "da0469d99486af1e2ccdabe9d5fc934144ea23ec2df1c4fc19fd6ccef7a4e95f"
+os.environ["OPENAI_API_KEY"] = "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"
+
 serpapi_api_key = os.getenv('SERPAPI_API_KEY')
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
 
 search = SerpAPIWrapper(serpapi_api_key=serpapi_api_key)
 tools = [

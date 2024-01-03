@@ -28,7 +28,7 @@ openai_api_key = os.getenv("OPENAI_API_KEY")
 
 def print_w(text):
     # 파일에 텍스트 작성
-    with open("target.txt", 'a') as file:  # 'a' 모드를 사용하여 파일 끝에 추가
+    with open("target_test.txt", 'a') as file:  # 'a' 모드를 사용하여 파일 끝에 추가
         file.write(text + "\n")
     file.close()
 
@@ -46,12 +46,11 @@ class DialogueAgent:
         self.reset()
 
     def reset(self):
-        self.message_history = ["Here is the conversation so far."]
+        self.message_history = ["지금까지의 대화 내용입니다."]
 
     def send(self) -> str:
         """
-        Applies the chatmodel to the message history
-        and returns the message string
+        메시지 기록에 대한 챗모델을 적용하고 메시지 문자열을 반환합니다.
         """
         message = self.model(
             [
@@ -63,7 +62,7 @@ class DialogueAgent:
 
     def receive(self, name: str, message: str) -> None:
         """
-        Concatenates {message} spoken by {name} into message history
+        메시지 기록에 {name}의 {message}를 추가합니다.
         """
         self.message_history.append(f"{name}: {message}")
 
@@ -84,34 +83,34 @@ class DialogueSimulator:
 
     def inject(self, name: str, message: str):
         """
-        Initiates the conversation with a {message} from {name}
+        {name}으로부터 시작하는 {message}로 대화를 시작합니다.
         """
         for agent in self.agents:
             agent.receive(name, message)
 
-        # increment time
+        # 시간 증가
         self._step += 1
 
     def step(self) -> tuple[str, str]:
-        # 1. choose the next speaker
+        # 1. 다음 발언자 선택
         speaker_idx = self.select_next_speaker(self._step, self.agents)
         speaker = self.agents[speaker_idx]
 
-        # 2. next speaker sends message
+        # 2. 다음 발언자가 메시지를 보냄
         message = speaker.send()
 
-        # 3. everyone receives message
+        # 3. 모든 에이전트가 메시지를 수신
         for receiver in self.agents:
             receiver.receive(speaker.name, message)
 
-        # 4. increment time
+        # 4. 시간 증가
         self._step += 1
 
         return speaker.name, message
 
 class IntegerOutputParser(RegexParser):
     def get_format_instructions(self) -> str:
-        return "Your response should be an integer delimited by angled brackets, like this: <int>."
+        return "응답은 이와 같은 꺽쇠 괄호 안에 정수로 표현되어야 합니다: <int>."
 
 
 class DirectorDialogueAgent(DialogueAgent):
@@ -129,21 +128,21 @@ class DirectorDialogueAgent(DialogueAgent):
 
         self.stop = False
         self.stopping_probability = stopping_probability
-        self.termination_clause = "Finish the conversation by stating a concluding message and thanking everyone."
-        self.continuation_clause = "Do not end the conversation. Keep the conversation going by adding your own ideas."
+        self.termination_clause = "종결 메시지를 말하고 모든 사람에게 감사함을 표시함으로써 대화를 마무리합니다."
+        self.continuation_clause = "대화를 종료하지 마세요. 자신의 아이디어를 추가하여 대화를 이어가세요."
 
-        # 1. have a prompt for generating a response to the previous speaker
+        # 1. 이전 발언자에게 응답을 생성하기 위한 프롬프트
         self.response_prompt_template = PromptTemplate(
             input_variables=["message_history", "termination_clause"],
             template=f"""{{message_history}}
 
-Follow up with an insightful comment.
+통찰력 있는 논평(comment)으로 이어가세요..
 {{termination_clause}}
 {self.prefix}
         """,
         )
 
-        # 2. have a prompt for deciding who to speak next
+        # 2. 다음에 말할 사람을 결정하기 위한 프롬프트
         self.choice_parser = IntegerOutputParser(
             regex=r"<(\d+)>", output_keys=["choice"], default_output_key="choice"
         )
@@ -151,32 +150,32 @@ Follow up with an insightful comment.
             input_variables=["message_history", "speaker_names"],
             template=f"""{{message_history}}
 
-Given the above conversation, select the next speaker by choosing index next to their name: 
+위 대화를 바탕으로 다음 발언자를 선택하세요. 이름 옆의 인덱스를 선택하세요: 
 {{speaker_names}}
 
 {self.choice_parser.get_format_instructions()}
 
-Do nothing else.
+다른 것은 하지 마세요.
         """,
         )
 
-        # 3. have a prompt for prompting the next speaker to speak
+        # 3. 다음 발언자에게 말하도록 유도하는 프롬프트
         self.prompt_next_speaker_prompt_template = PromptTemplate(
             input_variables=["message_history", "next_speaker"],
             template=f"""{{message_history}}
 
-The next speaker is {{next_speaker}}. 
-Prompt the next speaker to speak with an insightful question.
+다음 발언자는 {{next_speaker}}입니다.
+통찰력 있는 질문으로 다음 발언자에게 말하도록 유도하세요.
 {self.prefix}
         """,
         )
 
     def _generate_response(self):
-        # if self.stop = True, then we will inject the prompt with a termination clause
+        # 만약 self.stop = True이면, termination clause으로 프롬프트를 주입합니다
         sample = random.uniform(0, 1)
         self.stop = sample < self.stopping_probability
 
-        print_w(f"\tStop? {self.stop}\n")
+        print_w(f"\t중단하나요? {self.stop}\n")
 
         response_prompt = self.response_prompt_template.format(
             message_history="\n".join(self.message_history),
@@ -194,13 +193,13 @@ Prompt the next speaker to speak with an insightful question.
 
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(2),
-        wait=tenacity.wait_none(),  # No waiting time between retries
+        wait=tenacity.wait_none(),  # 재시도 간 대기 시간 없음
         retry=tenacity.retry_if_exception_type(ValueError),
         before_sleep=lambda retry_state: print_w(
-            f"ValueError occurred: {retry_state.outcome.exception()}, retrying..."
+            f"ValueError 발생: {retry_state.outcome.exception()}, 재시도 중..."
         ),
         retry_error_callback=lambda retry_state: 0,
-    )  # Default value when all retries are exhausted
+    )  # 모든 재시도가 소진될 때 기본 값
     def _choose_next_speaker(self) -> str:
         speaker_names = "\n".join(
             [f"{idx}: {name}" for idx, name in enumerate(self.speakers)]
@@ -227,21 +226,20 @@ Prompt the next speaker to speak with an insightful question.
 
     def send(self) -> str:
         """
-        Applies the chatmodel to the message history
-        and returns the message string
+        메시지 기록에 챗모델을 적용하여 메시지 문자열을 반환합니다.
         """
-        # 1. generate and save response to the previous speaker
+        # 1. 이전 발언자에게 응답을 생성하고 저장
         self.response = self._generate_response()
 
         if self.stop:
             message = self.response
         else:
-            # 2. decide who to speak next
+            # 2. 다음에 말할 사람을 결정
             self.chosen_speaker_id = self._choose_next_speaker()
             self.next_speaker = self.speakers[self.chosen_speaker_id]
-            print_w(f"\tNext speaker: {self.next_speaker}\n")
+            print_w(f"\t다음 발언자: {self.next_speaker}\n")
 
-            # 3. prompt the next speaker to speak
+            # 3. 다음 발언자에게 말하도록 유도
             next_prompt = self.prompt_next_speaker_prompt_template.format(
                 message_history="\n".join(
                     self.message_history + [self.prefix] + [self.response]
@@ -259,30 +257,30 @@ Prompt the next speaker to speak with an insightful question.
         return message
     
 
-topic = "Your goal is to design a single-page Pong game webpage using vanilla JavaScript and Django. Write the file and folder structure as a tree. Use code blocks with markdown for class names, descriptions, and goals. All courses should actively utilize your area of expertise and communicate with each other. All courses should be documented."
-director_name = "Jane Doe"
+topic = "당신의 목표는 바닐라 자바스크립트와 장고를 사용하여 싱글 페이지 퐁 게임 웹페이지를 디자인하는 것입니다. 파일 및 폴더 구조를 트리로 작성하세요. 클래스 이름, 설명 및 목표에 대해 마크다운을 사용한 코드 블록을 사용하세요. 모든 과정에서 당신의 전문 분야를 적극적으로 활용하고 서로 소통해야 합니다. 모든 과정은 문서화되어야 합니다."
+director_name = "Steve"
 agent_summaries = OrderedDict(
     {
-        "Project Manager": ("Project Director", "Project Manager"),
-        "Frontend Developer": ("Develop using pure vanilla JavaScript. You'll also need to leverage the Bootstrap toolkit", "Frontend Developer"),
-        "Backend developers": ("Develop your backend using the Django framework", "Backend developers"),
-        "Database Administrator": (" Manage and optimize PostgreSQL databases.", "Database Administrator"),
-        "System architecture": ("Design and implement the backend as microservices.", "System architecture"),
+        "SY": ("프로젝트 디렉터", "프로젝트 관리자"),
+        "SJ": ("순수 바닐라 자바스크립트를 사용하여 개발합니다. 부트스트랩 툴킷을 활용할 필요도 있습니다", "프론트엔드 개발자"),
+        "SL": ("장고 프레임워크를 사용하여 백엔드를 개발합니다", "백엔드 개발자"),
+        "SH": ("PostgreSQL 데이터베이스를 관리하고 최적화합니다.", "데이터베이스 관리자"),
+        "MS": ("백엔드를 마이크로서비스로 설계하고 구현합니다.", "시스템 아키텍처"),
     }
 )
 
 agent_summary_string = "\n- ".join(
     [""]
     + [
-        f"{name}: {role}, located in {location}"
+        f"{name}: {role}, {location} 직무를 담당합니다."
         for name, (role, location) in agent_summaries.items()
     ]
 )
 
-conversation_description = f"""This is a conversation about designing for this topic: {topic}.
-This discussion features a team of experts, including {agent_summary_string}, who each bring unique insights and expertise to the development and implementation of gaming platforms. You should have specific programming design patterns, file and folder structures, and names and functional descriptions of classes."""
+conversation_description = f"""이것은 이 주제에 대한 디자인에 관한 대화입니다: {topic}.
+이 토론에는 게임 플랫폼의 개발 및 구현에 고유한 통찰력과 전문 지식을 제공하는 {agent_summary_string}을/를 포함한 전문가 팀이 참여합니다. 특정 프로그래밍 디자인 패턴, 파일 및 폴더 구조, 클래스 이름 및 기능 설명이 있어야 합니다."""
 agent_descriptor_system_message = SystemMessage(
-    content="Talk about the specifics of the design based on each team member's role."
+    content="각 팀원의 역할에 따른 디자인의 구체적인 사항에 대해 이야기하세요."
 )
 
 
@@ -291,9 +289,9 @@ def generate_agent_description(agent_name, agent_role, agent_location):
         agent_descriptor_system_message,
         HumanMessage(
             content=f"""{conversation_description}
-            Please reply with a professional description of {agent_name}, who is a {agent_role} in {agent_location}, that emphasizes their particular role and location.
-            Speak directly to {agent_name}
-            Do not add anything else."""
+            {agent_role}업무를 하는 {agent_location}직무 담당인 {agent_name}에 대해 전문적인 설명으로 답변해주세요. 이 때 그들의 업무와 직무를 강조해주세요.
+            {agent_name}님과 직접 대화하세요.
+            다른 것을 추가하지 마세요."""
         ),
     ]
     agent_description = ChatOpenAI(model="gpt-4", temperature=1.0)(agent_specifier_prompt).content
@@ -302,10 +300,10 @@ def generate_agent_description(agent_name, agent_role, agent_location):
 
 def generate_agent_header(agent_name, agent_role, agent_location, agent_description):
     return f"""{conversation_description}
-Your name is {agent_name}, your role is {agent_role}, and you are located in {agent_location}.
-Your description is as follows: {agent_description}
-You are discussing the topic: {topic}.
-Your goal is to provide the most informative, professional, and direct design on the topic from the perspective of your role and location.
+당신의 이름은 {agent_name}, 당신의 업무는 {agent_role}, 그리고 당신은 {agent_location}직무를 담당합니다.
+당신에 대한 설명은 다음과 같습니다: {agent_description}
+당신은 다음 주제에 대해 논의하고 있습니다.: {topic}
+당신의 목표는 당신의 업무와 직무 담당자의 관점에서 주제에 대한 가장 유익하고 전문적이며 직접적인 디자인을 제공하는 것입니다.
 """
 
 
@@ -313,15 +311,15 @@ def generate_agent_system_message(agent_name, agent_header):
     return SystemMessage(
         content=(
             f"""{agent_header}
-You will speak in the style of {agent_name}, and exaggerate your personality.
-You should have specific programming design patterns, file and folder structures, and names and functional descriptions of classes and functions.
-Do not say the same things over and over again.
-Speak in the first person from the perspective of {agent_name}
-Do not change roles!
-Do not speak from the perspective of anyone else.
-Speak only from the perspective of {agent_name}.
-Stop speaking the moment you finish speaking from your perspective.
-Do not add anything else.
+당신은 {agent_name} 스타일로 말하고 당신의 성격을 과장할 것입니다.
+구체적인 프로그래밍 디자인 패턴, 파일 및 폴더 구조, 클래스와 함수의 이름 및 기능적 설명이 있어야 합니다.
+같은 말을 반복해서 말하지 마세요.
+{agent_name}의 관점에서 1인칭으로 말하세요.
+역할을 변경하지 마세요!
+다른 사람의 관점에서 말하지 마세요.
+오직 {agent_name}의 관점에서만 말하세요.
+당신의 관점에서 말하기가 끝나는 순간 말하기를 중단하십시오.
+다른 것을 추가하지 마세요.
     """
         )
     )
@@ -345,40 +343,40 @@ agent_system_messages = [
 for name, description, header, system_message in zip(
     agent_summaries, agent_descriptions, agent_headers, agent_system_messages
 ):
-    print_w(f"\n\n{name} Description:")
+    print_w(f"\n\n{name} 설명:")
     print_w(f"\n{description}")
     print_w(f"\nHeader:\n{header}")
     print_w(f"\nSystem Message:\n{system_message.content}")
 
 topic_specifier_prompt = [
-    SystemMessage(content="You can make a task more specific."),
+    SystemMessage(content="당신은 이 작업을 더 구체적으로 만들 수 있습니다."),
     HumanMessage(
         content=f"""{conversation_description}
-        Tell us more about your topic. 
-        Organize your topic into one question that needs to be answered.
-        Demonstrate your subject matter expertise.
-        Stick to the specified topic.
-        Don't add anything else."""
+        당신의 주제에 대해 더 많이 알려주세요.
+        답변이 필요한 하나의 질문으로 주제를 정리하세요.
+        당신의 전문 분야 지식을 보여주세요.
+        지정된 주제에 집중하세요.
+        다른 것은 추가하지 마세요."""
     ),
 ]
 specified_topic = ChatOpenAI(model="gpt-4", temperature=1.0)(topic_specifier_prompt).content
 
-print_w(f"Original topic:\n{topic}\n")
-print_w(f"Detailed topic:\n{specified_topic}\n")
+print_w(f"원래 주제:\n{topic}\n")
+print_w(f"구체적인 주제:\n{specified_topic}\n")
 
 def select_next_speaker(
     step: int, agents: List[DialogueAgent], director: DirectorDialogueAgent
 ) -> int:
     """
-    If the step is even, then select the director
-    Otherwise, the director selects the next speaker.
+    step이 짝수이면, director를 선택합니다.
+    그렇지 않으면, director가 다음 발언자를 선택합니다.
     """
-    # the director speaks on odd steps
+    # 디렉터는 홀수 스텝에서만 말합니다.
     if step % 2 == 1:
         idx = 0
     else:
-        # here the director chooses the next speaker
-        idx = director.select_next_speaker() + 1  # +1 because we excluded the director
+        # 여기에서 디렉터는 다음 발언자를 선택합니다.
+        idx = director.select_next_speaker() + 1  # +1은 디렉터를 제외하기 때문입니다.
     return idx
 
 director = DirectorDialogueAgent(
@@ -406,8 +404,8 @@ for name, system_message in zip(
     selection_function=functools.partial(select_next_speaker, director=director),
 )
 simulator.reset()
-simulator.inject("Audience member", specified_topic)
-print_w(f"(Audience member): {specified_topic}")
+simulator.inject("청중 멤버", specified_topic)
+print_w(f"(청중 멤버): {specified_topic}")
 print_w("\n")
 
 while True:
