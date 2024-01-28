@@ -21,14 +21,14 @@ set_debug(True)
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
-os.environ["OPENAI_API_KEY"] = "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"
+os.environ["OPENAI_API_KEY"] = "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"
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
 
 def print_w(text):
     # 파일에 텍스트 작성
-    with open("target_sal_test1.txt", 'a') as file:  # 'a' 모드를 사용하여 파일 끝에 추가
+    with open("target_sal_test_3.5.txt", 'a') as file:  # 'a' 모드를 사용하여 파일 끝에 추가
         file.write(text + "\n")
     file.close()
 
@@ -294,7 +294,8 @@ def generate_agent_description(agent_name, agent_role, agent_location):
             다른 것을 추가하지 마세요."""
         ),
     ]
-    agent_description = ChatOpenAI(model="gpt-4", temperature=1.0)(agent_specifier_prompt).content
+    # agent_description = ChatOpenAI(model="gpt-4", temperature=1.0)(agent_specifier_prompt).content
+    agent_description = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=1.0)(agent_specifier_prompt).content
     return agent_description
 
 
@@ -359,7 +360,8 @@ topic_specifier_prompt = [
         다른 것은 추가하지 마세요."""
     ),
 ]
-specified_topic = ChatOpenAI(model="gpt-4", temperature=1.0)(topic_specifier_prompt).content
+# specified_topic = ChatOpenAI(model="gpt-4", temperature=1.0)(topic_specifier_prompt).content
+specified_topic = ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=1.0)(topic_specifier_prompt).content
 
 print_w(f"원래 주제:\n{topic}\n")
 print_w(f"구체적인 주제:\n{specified_topic}\n")
@@ -382,7 +384,8 @@ def select_next_speaker(
 director = DirectorDialogueAgent(
     name=director_name,
     system_message=agent_system_messages[0],
-    model=ChatOpenAI(model="gpt-4", temperature=0.2),
+    # model=ChatOpenAI(model="gpt-4", temperature=0.2),
+    model=ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.2),
     speakers=[name for name in agent_summaries if name != director_name],
     stopping_probability=0.1,
 )
@@ -395,7 +398,8 @@ for name, system_message in zip(
         DialogueAgent(
             name=name,
             system_message=system_message,
-            model=ChatOpenAI(model="gpt-4", temperature=0.2),
+            # model=ChatOpenAI(model="gpt-4", temperature=0.2),
+            model=ChatOpenAI(model="gpt-3.5-turbo-1106", temperature=0.2),
         )
     )
 
